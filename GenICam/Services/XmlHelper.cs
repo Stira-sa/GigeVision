@@ -54,7 +54,6 @@ namespace GenICam
 
             CategoryDictionary = await GetCategoryFeatures(categoryList);
 
-            TempDictionary.Clear();
         }
 
         private async Task<List<ICategory>> GetCategoryFeatures(XmlNode categoryList)
@@ -95,7 +94,7 @@ namespace GenICam
         private async Task<List<ICategory>> ReadCategoryFeature(XmlNode node)
         {
             var pFeatures = new List<ICategory>();
-            ICategory category = null;
+            ICategory category;
             if (node.Name != "pFeature")
                 return pFeatures;
 
@@ -391,7 +390,7 @@ namespace GenICam
 
         private async Task<ICategory> GetCommandCategory(XmlNode xmlNode)
         {
-            Dictionary<string, IMathematical> expressions = new Dictionary<string, IMathematical>();
+            Dictionary<string, IMathematical> expressions;
             IPValue pValue = null;
             var categoryProperties = await GetCategoryProperties(xmlNode);
 
@@ -581,7 +580,6 @@ namespace GenICam
                 }
 
             }
-
 
             return new GenIntReg(address, length, accessMode, expressions, pAddress, GenPort);
         }
