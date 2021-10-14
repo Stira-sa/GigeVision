@@ -83,44 +83,44 @@ namespace GenICam
 
             var key = (await GetAddress()).ToString();
 
-            var tempValue = await TempDictionary.Get(key);
-            if (tempValue is not null)
-                value = (long)tempValue;
-            else
+            var reply = await Get(Length);
+
+            await Task.Run(() =>
             {
-                var reply = await Get(Length);
-
-                await Task.Run(() =>
+                if (reply.MemoryValue != null)
                 {
-                    if (reply.MemoryValue != null)
-                    {
-                        switch (Length)
-                        {
-                            case 2:
-                                value = BitConverter.ToUInt16(reply.MemoryValue);
-                                break;
+                    value = ConvertBytesToLong(reply.MemoryValue);
+                }
+                else
+                {
+                    value = ReadMask(reply.RegisterValue);
+                }
+            });
+            return value;
+        }
 
-                            case 4:
-                                value = BitConverter.ToUInt32(reply.MemoryValue);
-                                break;
+        private long ConvertBytesToLong(byte[] valueBytes)
+        {
+            long value;
+            switch (Length)
+            {
+                case 2:
+                    value = BitConverter.ToUInt16(valueBytes);
+                    break;
 
-                            case 8:
-                                value = BitConverter.ToInt64(reply.MemoryValue);
-                                break;
+                case 4:
+                    value = BitConverter.ToUInt32(valueBytes);
+                    break;
 
-                            default:
-                                value = BitConverter.ToInt64(reply.MemoryValue);
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        value = ReadMask(reply.RegisterValue);
-                    }
-                });
-                await TempDictionary.Add(key, value);
-                
+                case 8:
+                    value = BitConverter.ToInt64(valueBytes);
+                    break;
+
+                default:
+                    value = BitConverter.ToInt64(valueBytes);
+                    break;
             }
+
             return value;
         }
 
@@ -135,7 +135,7 @@ namespace GenICam
                 var lsbMask = mask >> lsb;
                 mask = msbMask | lsbMask;
                 var shift = (short)((Length * 8) - 1) - lsb;
-                value = (Int64)(registerValue & mask) >> shift;
+                value = Convert.ToInt64((registerValue & mask) >> shift);
             }
             else if (Bit is byte bit)
             {
@@ -144,7 +144,7 @@ namespace GenICam
                 var bits = new BitArray(bytesValue);
 
                 if (bits[bit])
-                    value = (long)Math.Pow(2, (bit));
+                    value = Convert.ToInt64(Math.Pow(2, (bit)));
             }
 
             return value;
