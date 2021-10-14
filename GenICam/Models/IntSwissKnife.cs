@@ -45,7 +45,124 @@ namespace GenICam
                 }
             }
 
-            Value = ExecuteFormula();
+            //Value = ExecuteFormula();
+        }
+        /// <summary>
+        /// this method calculates the formula and returns the result
+        /// </summary>
+        /// <param name="intSwissKnife"></param>
+        /// <returns></returns>
+        private async Task<double> ExecuteFormula()
+        {
+            try
+            {
+
+                if (Expressions != null)
+                {
+                    foreach (var expression in Expressions.ToList())
+                    {
+                        foreach (var word in expression.Value.Split())
+                        {
+                            await ReadExpressionPValues(word);
+
+                            foreach (var constant in Constants)
+                            {
+                                if (constant.Key.Equals(word))
+                                {
+                                    Expressions[expression.Key] = expression.Value.Replace(word, constant.Value.ToString());
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                foreach (var word in Formula.Split())
+                {
+                    await ReadExpressionPValues(word);
+
+                    if (Constants != null)
+                    {
+                        foreach (var constant in Constants)
+                        {
+                            if (constant.Key.Equals(word))
+                            {
+                                Formula = Formula.Replace(word, constant.Value.ToString());
+
+                                break;
+                            }
+                        }
+                    }
+
+                    if (Expressions != null)
+                    {
+                        foreach (var expression in Expressions)
+                        {
+                            if (expression.Key.Equals(word))
+                            {
+                                Formula = Formula.Replace(word, expression.Value);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (Formula != string.Empty)
+                {
+                    string formula = Formula;
+                    while (opreations.Any(c => formula.Contains(c)))
+                    {
+                        formula = EvaluateFormula(formula);
+                    return Evaluate(formula);
+                    }
+                }
+
+            }
+            catch (Exception ex)
+            {
+
+                throw;
+            }
+
+            return 0;
+        }
+
+        private string EvaluateFormula(string formula)
+        {
+            double result;
+            string equation;
+
+            foreach (var item in formula.Split('(', StringSplitOptions.None))
+            {
+                equation = item;
+                if (item.Contains(')'))
+                    equation = item.Substring(0, item.IndexOf(')'));
+
+                if (equation.Contains('+') || equation.Contains('-') || equation.Contains('/') || equation.Contains('*'))
+                {
+
+                    var last = equation.Replace(" ", "");
+                    formula = formula.Replace(" ", "");
+                    //last = last.Substring(0, last.Length - 1);
+                    if (last != "+" || last != "-" || last != "/" || last != "*")
+                    {
+                        result = Evaluate(last);
+                        if (formula.Contains($"({last})"))
+                            formula = formula.Replace($"({last})", result.ToString());
+                        else
+                            formula = formula.Replace(last, result.ToString());
+                    }
+                }
+
+                if (formula.Contains($"({equation})"))
+                    formula = formula.Replace($"({equation})", equation);
+
+            }
+            if (formula.Contains("("))
+            {
+                formula = EvaluateFormula(formula);
+            }
+            return formula;
         }
 
         /// <summary>
@@ -78,7 +195,7 @@ namespace GenICam
         /// </summary>
         /// <param name="expression"></param>
         /// <returns></returns>
-        public static double Evaluate(string expression)
+        public double Evaluate(string expression)
         {
             expression = "( " + expression + " )";
             foreach (var character in opreations)
@@ -308,7 +425,7 @@ namespace GenICam
         /// <param name="opreators"></param>
         /// <param name="values"></param>
         /// <returns></returns>
-        private static bool DoMathOpreation(string opreator, Stack<string> opreators, Stack<double> values)
+        private bool DoMathOpreation(string opreator, Stack<string> opreators, Stack<double> values)
         {
             bool tempBoolean = false;
             double value = 0;
@@ -530,7 +647,7 @@ namespace GenICam
         /// </summary>
         /// <param name="value"></param>
         /// <returns></returns>
-        private static long GetLongValueFromString(string value)
+        private long GetLongValueFromString(string value)
         {
             if (value.StartsWith("0x"))
             {
@@ -545,100 +662,6 @@ namespace GenICam
             catch (Exception ex)
             {
             }
-            return 0;
-        }
-
-        /// <summary>
-        /// this method calculates the formula and returns the result
-        /// </summary>
-        /// <param name="intSwissKnife"></param>
-        /// <returns></returns>
-        private async Task<double> ExecuteFormula()
-        {
-            if (Expressions != null)
-            {
-                foreach (var expression in Expressions.ToList())
-                {
-                    foreach (var word in expression.Value.Split())
-                    {
-                        await ReadExpressionPValues(word);
-
-                        foreach (var constant in Constants)
-                        {
-                            if (constant.Key.Equals(word))
-                            {
-                                Expressions[expression.Key] = expression.Value.Replace(word, constant.Value.ToString());
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            foreach (var word in Formula.Split())
-            {
-                await ReadExpressionPValues(word);
-
-                if (Constants != null)
-                {
-                    foreach (var constant in Constants)
-                    {
-                        if (constant.Key.Equals(word))
-                        {
-                            Formula = Formula.Replace(word, constant.Value.ToString());
-
-                            break;
-                        }
-                    }
-                }
-
-                if (Expressions != null)
-                {
-                    foreach (var expression in Expressions)
-                    {
-                        if (expression.Key.Equals(word))
-                        {
-                            Formula = Formula.Replace(word, expression.Value);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            double result;
-            if (Formula != string.Empty)
-            {
-                string formula = Formula;
-                string equation = "";
-                while (opreations.Any(c=>formula.Contains(c)))
-                {
-                    foreach (var item in formula.Split('(', StringSplitOptions.None))
-                    {
-                        equation = item;
-                        if (item.Contains(')'))
-                            equation = item.Substring(0, item.IndexOf(')'));
-
-                        if (equation.Contains('+') || equation.Contains('-') || equation.Contains('/') || equation.Contains('*'))
-                        {
-                            var last = equation.Replace(" ", "");
-                            last = last.Substring(0, last.Length - 1);
-                            if (last != "+" || last != "-" || last != "/" || last != "*")
-                            {
-                                result = Evaluate(last);
-                                if (formula.Contains($"({last})"))
-                                    formula = formula.Replace($"({last})", result.ToString());
-                                else
-                                    formula = formula.Replace(last, result.ToString());
-                            }
-                        }
-
-                        if (formula.Contains($"({equation})"))
-                            formula = formula.Replace($"({equation})", equation);
-                    }
-                    return Evaluate(formula);
-                }
-            }
-
             return 0;
         }
 
