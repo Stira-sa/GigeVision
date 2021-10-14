@@ -102,6 +102,7 @@ namespace GigeVision.Core.Models
         public Dictionary<string, string> RegistersDictionary { get; set; }
 
         public Dictionary<string, IPValue> RegistersDictionaryValues { get; set; }
+        public bool IsLoadingXml { get; private set; }
 
         /// <summary>
         /// Check camera status
@@ -322,15 +323,20 @@ namespace GigeVision.Core.Models
         /// <returns>Register dictionary</returns>
         public async Task<Dictionary<string, string>> ReadAllRegisterAddressFromCameraAsync(string cameraIp)
         {
+            try
+            {
+                RegistersDictionary = new Dictionary<string, string>();
+                RegistersDictionaryValues = new Dictionary<string, IPValue>();
 
-            if (!ValidateIp(CameraIp)) throw new InvalidIpException();
+                IsLoadingXml = true;
 
-            //loading the XML file
-            XmlDocument xml = new XmlDocument();
-            xml.Load(await GetXmlFileFromCamera(cameraIp).ConfigureAwait(false));
+                if (!ValidateIp(CameraIp)) throw new InvalidIpException();
+
+                //loading the XML file
+                XmlDocument xml = new XmlDocument();
+                xml.Load(await GetXmlFileFromCamera(cameraIp).ConfigureAwait(false));
 
             var xmlHelper = new XmlHelper("Category", xml, new GenPort(this));
-            await xmlHelper.LoadUp();
             CategoryDictionary = xmlHelper.CategoryDictionary;
 
 
@@ -341,11 +347,20 @@ namespace GigeVision.Core.Models
                     RegistersDictionary = new Dictionary<string, string>();
                     RegistersDictionaryValues = new Dictionary<string, IPValue>();
                     RegistersDictionary.Add("XmlVersion", xmlHelper.Xmlns.InnerText);
-                    await ReadAllRegisters(CategoryDictionary);
+                    ReadAllRegisters(CategoryDictionary);
                 }
             }
 
-            return RegistersDictionary;
+                return RegistersDictionary;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                IsLoadingXml = false;
+            }
         }
 
         /// <summary>
@@ -364,7 +379,7 @@ namespace GigeVision.Core.Models
 
             //loading the XML file
             XmlDocument xml = new XmlDocument();
-            xml.Load(await GetXmlFileFromCamera(gvcp.CameraIp));
+            xml.Load(await GetXmlFileFromCamera(gvcp.CameraIp).ConfigureAwait(false));
 
             //handling the name-space of the XML file to cover all the cases
             var xmlHelper = new XmlHelper("Category", xml, new GenPort(this));
@@ -377,7 +392,7 @@ namespace GigeVision.Core.Models
                     RegistersDictionary = new Dictionary<string, string>();
                     RegistersDictionaryValues = new Dictionary<string, IPValue>();
                     RegistersDictionary.Add("XmlVersion", xmlHelper.Xmlns.InnerText);
-                    await ReadAllRegisters(CategoryDictionary);
+                    ReadAllRegisters(CategoryDictionary);
                 }
             }
             //finding the nodes and their values

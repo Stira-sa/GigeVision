@@ -133,7 +133,6 @@ namespace GigeVision.Core.Models
                 if (value != width)
                 {
                     width = value;
-                    streamReceiver?.ResetPacketSize();
                     OnPropertyChanged(nameof(Width));
                 }
             }
@@ -150,7 +149,6 @@ namespace GigeVision.Core.Models
                 if (value != height)
                 {
                     height = value;
-                    streamReceiver?.ResetPacketSize();
                     OnPropertyChanged(nameof(Height));
                 }
             }
@@ -255,7 +253,12 @@ namespace GigeVision.Core.Models
         }
 
         /// <summary>
-        /// This method will get current PC IP and Gets the Camera IP from Gvcp
+        /// Tolernace for missing packet
+        /// </summary>
+        public int MissingPacketTolerance { get; set; } = 0;
+
+        /// <summary>
+        /// This method will get current PC IP and Gets the Camera ip from Gvcp
         /// </summary>
         /// <param name="rxIP">If rxIP is not provided, method will detect system IP and use it</param>
         /// <param name="rxPort">It will set randomly when not provided</param>
@@ -510,6 +513,9 @@ namespace GigeVision.Core.Models
         {
             try
             {
+                if (Gvcp.IsLoadingXml)
+                    return false;
+
                 if (Gvcp.RegistersDictionary is null)
                 {
                     await Gvcp.ReadAllRegisterAddressFromCameraAsync().ConfigureAwait(false);
