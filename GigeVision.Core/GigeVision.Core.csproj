@@ -11,13 +11,19 @@
     <PackageTags>GigeVision, GeniCam, GVSP, GVCP</PackageTags>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>1.6</Version>
+    <Version>1.8.0</Version>
     <PackageLicenseFile>License.txt</PackageLicenseFile>
     <PackageIcon>gige.png</PackageIcon>
     <PackageIconUrl />
     <Platforms>AnyCPU;x64;x86</Platforms>
-    <PackageReleaseNotes>Improved GVSP Reception using raw sockets and Span&lt;byte&gt; With RaiseProperty</PackageReleaseNotes>
+    <PackageReleaseNotes>
+      1.8.0: Pushes the block id (frame number) in the frame event and Gives notification on frameloss
+      Fix Receiver IP Detection
+      Fix Discovery for all cameras in network
+    </PackageReleaseNotes>
+    <LangVersion>9.0</LangVersion>
     <Configurations>Debug;Release;PublishLocally</Configurations>
+    <PackageProjectUrl>https://github.com/Touseefelahi/GigeVision</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -32,7 +38,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stira.WpfCore" Version="1.0.1" />
+    <PackageReference Include="Stira.WpfCore" Version="1.1.0" />
+    <PackageReference Include="System.IO.Pipelines" Version="5.0.1" />
   </ItemGroup>
 
   <ItemGroup>
