@@ -2,10 +2,8 @@
 using GigeVision.Core.Models;
 using Stira.WpfCore;
 using System;
-using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -49,6 +47,7 @@ namespace GigeVision.Core.Services
         public int BufferSize { get; private set; }
         public bool IsReceiving { get; private set; }
         public int MissingPacketTolerance { get; private set; }
+        public int NetworkFps { get; set; }
         public GvspInfo GvspInfo { get; }
 
         /// <summary>
@@ -67,14 +66,12 @@ namespace GigeVision.Core.Services
             }
         }
 
-        public int NetworkFps { get;  set; }
-
         /// <summary>
         /// Start Rx thread using .Net
         /// </summary>
         public void StartRxThread()
         {
-            Thread threadDecode = new(DecodePacketsRawSocket)
+            Thread threadDecode = new(DecodePacketsRawSocket_bufferSwap)
             {
                 Priority = ThreadPriority.Highest,
                 Name = "Decode Packets Thread",
@@ -105,85 +102,11 @@ namespace GigeVision.Core.Services
             }
             catch (Exception ex)
             {
-                //Camera.Updates?.Invoke(UpdateType.ConnectionIssue, ex.Message);
+                // Camera.Updates?.Invoke(UpdateType.ConnectionIssue, ex.Message);
             }
         }
 
-        private void DecodePacketsRawSocket_workUnderprocess()
-        {
-            int packetID = 0, bufferIndex = 0, bufferLength = 0, bufferStart = 0, length = 0, packetRxCount = 0;
-            byte[][] buffer = new byte[2][];
-            buffer[0] = new byte[BufferSize];
-            buffer[1] = new byte[BufferSize];
-            IList<ArraySegment<byte>> buffers = new List<ArraySegment<byte>>();
-            try
-            {
-                DetectGvspType();
-                var header = new byte[GvspInfo.PayloadOffset * 1000];
-                var payload = new byte[GvspInfo.PayloadSize];
-                buffers.Add(new ArraySegment<byte>(header));
-                buffers.Add(new ArraySegment<byte>(payload));
-                StateObject state = new();
-                state.workSocket = socketRxRaw;
-                while (IsReceiving)
-                {
-                    var result = socketRxRaw.BeginReceive(header, 0, 8, SocketFlags.None,
-                        callback: (ar) =>
-                        {
-                            if (ar.IsCompleted)
-                            {
-                                if (header[4] == GvspInfo.DataIdentifier) //Packet
-                                {
-                                    packetRxCount++;
-                                    packetID = (header[GvspInfo.PacketIDIndex] << 8) | header[GvspInfo.PacketIDIndex + 1];
-                                    bufferStart = (packetID - 1) * GvspInfo.PayloadSize; //This use buffer length of regular packet
-                                    StateObject so = (StateObject)ar.AsyncState;
-                                    Socket s = so.workSocket;
-                                    int read = s.EndReceive(ar);
-                                    //socketRxRaw.BeginReceive(buffer[bufferIndex], bufferStart, GvspInfo.PayloadSize, SocketFlags.None,
-                                    //callback: (ar1) =>
-                                    //{
-                                    //    socketRxRaw.EndReceive(ar1);
-                                    //},
-                                    //state);
-                                    return;
-                                }
-                                if (header[4] == GvspInfo.DataEndIdentifier)
-                                {
-                                    if (GvspInfo.FinalPacketID == 0)
-                                    {
-                                        packetID = (header[GvspInfo.PacketIDIndex] << 8) | header[GvspInfo.PacketIDIndex + 1];
-                                        GvspInfo.FinalPacketID = packetID - 1;
-                                    }
-                                    //Checking if we receive all packets. Here 2 means we are allowing 1 packet miss
-                                    if (Math.Abs(packetRxCount - GvspInfo.FinalPacketID) < 2)
-                                    {
-                                        FrameReady?.Invoke(null, buffer[bufferIndex]);
-                                        NetworkFps++;
-                                        bufferIndex = bufferIndex == 0 ? 1 : 0;
-                                    }
-                                    packetRxCount = 0;
-                                    // socketRxRaw.EndReceive(ar);
-                                }
-                            }
-                        },
-                        state);
-                }
-            }
-            catch (Exception ex)
-            {
-                if (IsReceiving) // We didn't deliberately stop the stream
-                {
-                }
-            }
-        }
-
-        private void EndReceive(IAsyncResult ar)
-        {
-            throw new NotImplementedException();
-        }
-
-        private void DecodePacketsRawSocket()
+        private void DecodePacketsRawSocket_bufferSwap()
         {
             int packetID = 0, bufferIndex = 0, bufferLength = 0, bufferStart = 0, length = 0, packetRxCount = 1, packetRxCountClone, bufferIndexClone;
             ulong imageID, lastImageID = 0, lastImageIDClone, deltaImageID;
@@ -191,6 +114,7 @@ namespace GigeVision.Core.Services
             byte[][] buffer = new byte[2][];
             buffer[0] = new byte[BufferSize];
             buffer[1] = new byte[BufferSize];
+            int frameCounter = 0;
             try
             {
                 DetectGvspType();
@@ -217,8 +141,8 @@ namespace GigeVision.Core.Services
                         }
 
                         blockID = singlePacket.Slice(GvspInfo.BlockIDIndex, GvspInfo.BlockIDLength).ToArray();
-                        Array.Resize(ref blockID, 8);
                         Array.Reverse(blockID);
+                        Array.Resize(ref blockID, 8);
                         imageID = BitConverter.ToUInt64(blockID);
                         packetRxCountClone = packetRxCount;
                         lastImageIDClone = lastImageID;
@@ -227,13 +151,17 @@ namespace GigeVision.Core.Services
                         packetRxCount = 0;
                         lastImageID = imageID;
 
-                        Task.Run(() => //Send the image ready signal parallel, without breaking the reception
+                        Task.Run(() =>
                         {
                             //Checking if we receive all packets
                             if (Math.Abs(packetRxCountClone - GvspInfo.FinalPacketID) <= MissingPacketTolerance)
                             {
-                                FrameReady?.Invoke(imageID, buffer[bufferIndexClone]);
-                                NetworkFps++;
+                                ++frameCounter;
+                                FrameReady?.Invoke(imageID, buffer[bufferIndex]);
+                            }
+                            else
+                            {
+                                //Camera.Updates?.Invoke(UpdateType.FrameLoss, $"Image tx skipped because of {packetRxCountClone - GvspInfo.FinalPacketID} packet loss");
                             }
 
                             deltaImageID = imageID - lastImageIDClone;
@@ -254,7 +182,6 @@ namespace GigeVision.Core.Services
                 }
                 //_ = Camera.StopStream();
             }
-
         }
 
         private void DetectGvspType()
@@ -283,13 +210,5 @@ namespace GigeVision.Core.Services
             GvspInfo.FinalPacketID = 0;
         }
 
-        public class StateObject
-        {
-            public const int BUFFER_SIZE = 5510880;
-            public Socket workSocket = null;
-            public byte[] buffer = new byte[BUFFER_SIZE];
-            public StringBuilder sb = new StringBuilder();
-        }
     }
-
 }
