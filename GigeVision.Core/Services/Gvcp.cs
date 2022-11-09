@@ -273,7 +273,7 @@ namespace GigeVision.Core.Services
                 XmlDocument xml = new XmlDocument();
                 xml.Load(await GetXmlFileFromCamera(cameraIp).ConfigureAwait(false));
                 var xmlHelper = new XmlHelper(xml, new GenPort(this));
-                await xmlHelper.LoadUp();
+                await xmlHelper.LoadUp(true);
                 CategoryDictionary = xmlHelper.CategoryDictionary;
 
                 if (xmlHelper.CategoryDictionary != null)
@@ -431,7 +431,15 @@ namespace GigeVision.Core.Services
             XmlDocument xml = new XmlDocument();
             xml.Load(await GetXmlFileFromCamera(ip).ConfigureAwait(false));
             xmlHelper = new XmlHelper(xml, new GenPort(this));
-            IsXmlFileLoaded = await xmlHelper.LoadUp();
+            try
+            {
+                await xmlHelper.LoadUp();
+                IsXmlFileLoaded = true;
+            }
+            catch (Exception)
+            {
+                IsXmlFileLoaded = false;
+            }
 
             return IsXmlFileLoaded;
         }

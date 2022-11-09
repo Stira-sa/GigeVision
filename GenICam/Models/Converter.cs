@@ -93,22 +93,23 @@ namespace GenICam
 
         private async Task<double> ExecuteFormulaFrom()
         {
+            var formulaFrom = FormulaFrom;
             try
             {
-                foreach (var word in FormulaFrom.Split())
+                foreach (var word in formulaFrom.Split())
                 {
                     if (word.Equals("TO"))
                     {
                         long? value = null;
 
-                        value = await ExecuteFormulaTo();
+                        value = await PValue.GetValueAsync();
 
                         if (value is null)
                         {
                             throw new GenICamException("Failed to read formula register value", new NullReferenceException());
                         }
 
-                        FormulaFrom = FormulaFrom.Replace(word, string.Format("0x{0:X8}", value));
+                        formulaFrom = formulaFrom.Replace(word, string.Format("h.{0:X8}", value));
                     }
 
                     if (PVariables.ContainsKey(word))
@@ -122,11 +123,11 @@ namespace GenICam
                             throw new GenICamException("Failed to read formula register value", new NullReferenceException());
                         }
 
-                        FormulaFrom = FormulaFrom.Replace(word, string.Format("0x{0:X8}", value));
+                        formulaFrom = formulaFrom.Replace(word, string.Format(format: "h.{0:X8}", value));
                     }
                 }
-
-                return MathParserHelper.CalculateExpression(FormulaFrom);
+                formulaFrom = MathParserHelper.FormatExpression(formulaFrom);
+                return MathParserHelper.CalculateExpression(formulaFrom);
             }
             catch (Exception ex)
             {
@@ -138,7 +139,9 @@ namespace GenICam
         {
             try
             {
-                foreach (var word in FormulaTo.Split())
+                var formulaTo = FormulaTo;
+
+                foreach (var word in formulaTo.Split())
                 {
                     if (word.Equals("FROM"))
                     {
@@ -149,7 +152,7 @@ namespace GenICam
                             throw new GenICamException("Failed to read formula register value", new NullReferenceException());
                         }
 
-                        FormulaTo = FormulaTo.Replace(word, string.Format("0x{0:X8}", value));
+                        formulaTo = formulaTo.Replace(word, string.Format("h.{0:X8}", value));
                     }
 
                     if (PVariables.ContainsKey(word))
@@ -163,11 +166,11 @@ namespace GenICam
                             throw new GenICamException("Failed to read formula register value", new NullReferenceException());
                         }
 
-                        FormulaTo = FormulaTo.Replace(word, string.Format("0x{0:X8}", value));
+                        formulaTo = formulaTo.Replace(word, string.Format("h.{0:X8}", value));
                     }
                 }
-
-                return (long)MathParserHelper.CalculateExpression(FormulaTo);
+                formulaTo = MathParserHelper.FormatExpression(formulaTo);
+                return (long)MathParserHelper.CalculateExpression(formulaTo);
             }
             catch (Exception ex)
             {
