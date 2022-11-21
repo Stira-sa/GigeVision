@@ -20,7 +20,7 @@ namespace DeviceControl.Test.Wpf.ViewModels
 
         public MainWindowViewModel()
         {
-            DeviceControl = new DeviceControlViewModel("192.168.10.244");
+            DeviceControl = new DeviceControlViewModel("192.168.10.89");
         }
     }
 }
