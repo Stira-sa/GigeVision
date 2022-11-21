@@ -113,12 +113,17 @@ namespace GenICam
             formula = formula.Replace(" ", string.Empty);
 
             return formula.Replace("0x", "h.")
-                .Replace("|", "@|")
+                .Replace("&&", "AND")
+                .Replace("||", "OR")
                 .Replace("&", "@&")
+                .Replace("|", "@|")
                 .Replace("~", "@~")
                 .Replace("^", "@^")
                 .Replace("<<", "@<<")
-                .Replace(">>", "@>>");
+                .Replace("||", "OR")
+                .Replace("AND", "&&")
+                .Replace("OR", "||");
+
         }
 
         /// <summary>
@@ -376,7 +381,6 @@ namespace GenICam
                         }
                     }
 
-                    value = (double)values.Pop();
                     value = (double)values.Pop() + value;
                     values.Push(value);
                 }
@@ -395,7 +399,6 @@ namespace GenICam
                         }
                     }
 
-                    value = (double)values.Pop();
                     value = (double)values.Pop() - value;
                     values.Push(value);
                 }
